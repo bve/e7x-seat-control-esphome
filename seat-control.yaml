@@ -1,0 +1,168 @@
+esphome:
+  name: "seat-control"
+
+globals:
+  - id: ignition_status_inc
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: heat_driver_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"' 
+  - id: heat_passenger_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"' 
+  - id: vent_driver_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"'
+  - id: vent_passenger_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"'
+  - id: massage_driver_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"'
+  - id: massage_passenger_status
+    type: std::string
+    restore_value: no
+    initial_value: '"N/A"'
+          
+interval:
+  - interval: 50ms
+    then:
+      - canbus.send:
+          data: !lambda
+            id(ignition_status_inc) += 0x01;
+            if (id(ignition_status_inc) > 0xFF) {
+              id(ignition_status_inc) = 0x00;
+            }
+            return { 0x45, 0x41, 0x39, 0xBF, id(ignition_status_inc) };
+          can_id: 0x130
+  - interval: 500ms
+    then:
+      - canbus.send:
+          data: [ 0x00, 0x42, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]
+          can_id: 0x4F8  
+  - interval: 500ms
+    then:
+      - canbus.send:
+          data: [ 0xF0, 0xFF ]
+          can_id: 0x1E7 
+  - interval: 500ms
+    then:
+      - canbus.send:
+          data: [ 0xF0, 0xFF ]
+          can_id: 0x1E8 
+  - interval: 500ms
+    then:
+      - canbus.send:
+          data: [ 0xFC, 0xFF ]
+          can_id: 0x1EB 
+  - interval: 500ms
+    then:
+      - canbus.send:
+          data: [ 0xFC, 0xFF ]
+          can_id: 0x1EC 
+button:
+  - platform: template
+    name: "Heat (Driver)"
+    on_press:
+      - canbus.send:
+          data: [ 0xF1, 0xFF ]
+          can_id: 0x1E7   
+  - platform: template
+    name: "Heat (Passenger)"
+    on_press:
+      - canbus.send:
+          data: [ 0xF1, 0xFF ]
+          can_id: 0x1E8   
+  - platform: template
+    name: "Ventilation (Driver)"
+    on_press:
+      - canbus.send:
+          data: [ 0xF4, 0xFF ]
+          can_id: 0x1E7   
+  - platform: template
+    name: "Ventilation (Passenger)"
+    on_press:
+      - canbus.send:
+          data: [ 0xF4, 0xFF ]
+          can_id: 0x1E8 
+  - platform: template
+    name: "Massage (Driver)"
+    on_press:
+      - canbus.send:
+          data: [ 0xFD, 0xFF ]
+          can_id: 0x1EB   
+  - platform: template
+    name: "Massage (Passenger)"
+    on_press:
+      - canbus.send:
+          data: [ 0xFD, 0xFF ]
+          can_id: 0x1EC
+
+text_sensor:
+  - platform: template
+    name: "Heat (Driver) Level "
+    lambda: |-
+      return { id(heat_driver_status) };
+    update_interval: 1s
+  - platform: template
+    name: "Vent (Driver) Level "
+    lambda: |-
+      return { id(vent_driver_status) };
+    update_interval: 1s
+  - platform: template
+    name: "Massage (Driver) Level "
+    lambda: |-
+      return { id(massage_driver_status) };
+    update_interval: 1s
+    
+esp8266:
+  board: esp01_1m
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+captive_portal:
+
+spi:
+  id: McpSpi
+  clk_pin: GPIO16
+  mosi_pin: GPIO5
+  miso_pin: GPIO4
+
+canbus:
+  - platform: mcp2515
+    cs_pin: GPIO14
+    can_id: 4
+    bit_rate: 100kbps
+    on_frame:
+    - can_id: 0x232
+      then:
+        - lambda: |-
+            char buffer[100] = {0};
+            id(heat_driver_status) = itoa(x[0], buffer, 16);
+            id(massage_driver_status) = itoa(x[0], buffer, 16);
+            id(vent_driver_status) = itoa(x[1], buffer, 16);
+    - can_id: 0x233
+      then:
+        - lambda: |-
+            char buffer[100] = {0};
+            id(heat_passenger_status) = itoa(x[0], buffer, 16);
+            id(massage_passenger_status) = itoa(x[0], buffer, 16);
+            id(vent_passenger_status) = itoa(x[1], buffer, 16);vvvvvvvvvvvvvvvv
